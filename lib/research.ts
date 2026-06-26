@@ -164,10 +164,11 @@ async function performGeminiResearch(prompt: string): Promise<string> {
     //   contents: [{ role: 'user', parts: [{ text: `You are a thorough research assistant....\n\n${prompt}` }] }],
     // });
 
-    console.log('Starting Groq llama-3.1-8b research agent...');
+    // llama-3.1-8b-instant deprecated by Groq (decommissioned 2026-08-16); switched to recommended replacement
+    console.log('Starting Groq gpt-oss-20b research agent...');
 
     const completion = await getOpenAI().chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
       messages: [
         {
           role: 'system',
@@ -183,10 +184,10 @@ async function performGeminiResearch(prompt: string): Promise<string> {
     });
 
     const result = completion.choices[0].message.content || '';
-    console.log('Groq llama-3.1-8b research completed, result length:', result.length);
-    return result || 'No response from Groq llama-3.1-8b';
+    console.log('Groq gpt-oss-20b research completed, result length:', result.length);
+    return result || 'No response from Groq gpt-oss-20b';
   } catch (error) {
-    console.error('Error with Groq llama-3.1-8b research agent:', error);
+    console.error('Error with Groq gpt-oss-20b research agent:', error);
     throw error;
   }
 }

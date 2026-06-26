@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { ResearchSession, StartResearchRequest } from '@/types';
+import { ResearchSession, StartResearchRequest, WebSource } from '@/types';
 import { getOpenAI, performResearch } from '@/lib/research';
-import { retrieveContext, augmentPrompt } from '@/lib/rag';
+import { retrieveContext, augmentPrompt, augmentPromptWithWebSearch } from '@/lib/rag';
+import { webSearch } from '@/lib/tools/webSearch';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,8 +35,8 @@ export async function POST(request: NextRequest) {
       try {
         // RAG retrieval & augment entry points
         const ragContext = await retrieveContext(prompt, userId);
-        if (ragContext.relevantResults.length > 0) { 
-          finalPrompt = augmentPrompt(prompt, ragContext);
+        if (ragContext.relevantResults.length > 0) {
+          finalPrompt = augmentPrompt(finalPrompt, ragContext);
           console.log(`Augmented prompt with ${ragContext.relevantResults.length} RAG results`);
         } else {
           console.log('No RAG results retrieved (no similar past research or below similarity threshold)');
@@ -43,6 +44,20 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('RAG retrieval failed, continuing without context:', error);
       }
+
+      // Web search entry point — grounds research in live sources instead of model-only knowledge
+      let webSources: WebSource[] = [];
+      try {
+        const { results } = await webSearch(prompt);
+        if (results.length > 0) {
+          finalPrompt = augmentPromptWithWebSearch(finalPrompt, results);
+          webSources = results.map(r => ({ title: r.title, url: r.url }));
+          console.log(`Augmented prompt with ${results.length} web search results`);
+        }
+      } catch (error) {
+        console.error('Web search failed, continuing without it:', error);
+      }
+
       // Research session with document metadata
       const session: ResearchSession = {
         id: sessionId,
@@ -52,6 +67,7 @@ export async function POST(request: NextRequest) {
         initialPrompt: prompt,
         refinedPrompt: finalPrompt,
         refinementQuestions: [],
+        webSources,
         status: 'processing',
         createdAt: new Date(),
         updatedAt: new Date(),

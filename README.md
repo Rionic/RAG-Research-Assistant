@@ -2,7 +2,7 @@
 
 A full-stack web application featuring a **Retrieval-Augmented Generation (RAG) pipeline** that performs deep research using both OpenAI and Google Gemini APIs. The system learns from previous research sessions to provide increasingly relevant and context-aware results, delivering comprehensive PDF reports via email.
 
-> **Note:** The live deployment uses [Groq](https://groq.com/) (Llama 3.3 70B + Llama 3.1 8B) in place of OpenAI GPT-4o and Google Gemini to avoid API costs. The original OpenAI and Gemini code is preserved in comments in `lib/research.ts` and `app/api/research/route.ts`.
+> **Note:** The live deployment uses [Groq](https://groq.com/) (Llama 3.3 70B + GPT-OSS 20B) in place of OpenAI GPT-4o and Google Gemini to avoid API costs. The original OpenAI and Gemini code is preserved in comments in `lib/research.ts` and `app/api/research/route.ts`. (Llama 3.1 8B Instant was swapped for GPT-OSS 20B after Groq deprecated it in June 2026, ahead of its August 16, 2026 decommission.)
 
 ## 🌐 Live Demo
 

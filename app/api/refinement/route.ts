@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { ResearchSession, SubmitRefinementRequest } from '@/types';
+import { ResearchSession, SubmitRefinementRequest, WebSource } from '@/types';
 import { performResearch } from '@/lib/research';
-import { retrieveContext, augmentPrompt } from '@/lib/rag';
+import { retrieveContext, augmentPrompt, augmentPromptWithWebSearch } from '@/lib/rag';
+import { webSearch } from '@/lib/tools/webSearch';
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,9 +58,24 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('RAG retrieval failed, continuing without context:', error);
       }
+
+      // Web search entry point — grounds research in live sources instead of model-only knowledge
+      let webSources: WebSource[] = [];
+      try {
+        const { results } = await webSearch(session.initialPrompt);
+        if (results.length > 0) {
+          refinedPrompt = augmentPromptWithWebSearch(refinedPrompt, results);
+          webSources = results.map(r => ({ title: r.title, url: r.url }));
+          console.log(`Augmented prompt with ${results.length} web search results`);
+        }
+      } catch (error) {
+        console.error('Web search failed, continuing without it:', error);
+      }
+
       // Update firestore with refined prompt
       await sessionRef.update({
         refinedPrompt,
+        webSources,
         status: 'processing',
         updatedAt: new Date(),
       });

@@ -6,6 +6,15 @@ if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function sendResearchReport(session: ResearchSession): Promise<void> {
   if (!process.env.SENDGRID_API_KEY) {
     throw new Error('SendGrid API key is not configured');
@@ -204,6 +213,17 @@ function generateEmailHTML(session: ResearchSession, textSummary: string): strin
         <li>Professional PDF report (attached)</li>
       </ul>
     </div>
+
+    ${session.webSources && session.webSources.length > 0 ? `
+    <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 15px;">
+      <h3 style="margin-top: 0;">🌐 Web Sources</h3>
+      <ul style="margin: 0; padding-left: 20px;">
+        ${session.webSources.map(source => `
+          <li><a href="${escapeHtml(source.url)}">${escapeHtml(source.title)}</a></li>
+        `).join('')}
+      </ul>
+    </div>
+    ` : ''}
 
     <div style="text-align: center; margin-top: 30px;">
       <p style="color: #666; font-size: 14px;">

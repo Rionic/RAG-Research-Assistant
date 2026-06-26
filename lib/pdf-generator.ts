@@ -243,6 +243,15 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
     doc.line(margin, yPosition, pageWidth - margin, yPosition);
     yPosition += 5;
     addMarkdownText(session.geminiResult);
+    yPosition += 10;
+  }
+
+  if (session.webSources && session.webSources.length > 0) {
+    addText('Web Sources', 16, true);
+    session.webSources.forEach((source, index) => {
+      addText(`${index + 1}. ${source.title}`, 10);
+      addText(source.url, 9);
+    });
   }
 
   const totalPages = doc.getNumberOfPages();

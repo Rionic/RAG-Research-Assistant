@@ -20,6 +20,12 @@ export interface RefinementQuestion {
   answer?: string;
 }
 
+// A web source surfaced by the web search tool, used to ground research and cite sources
+export interface WebSource {
+  title: string;
+  url: string;
+}
+
 // Research session with all related metadata
 export interface ResearchSession {
   id: string;
@@ -29,6 +35,7 @@ export interface ResearchSession {
   initialPrompt: string;
   refinedPrompt?: string;
   refinementQuestions: RefinementQuestion[];
+  webSources?: WebSource[];
   openaiResult?: string;
   geminiResult?: string;
   status: ResearchStatus;

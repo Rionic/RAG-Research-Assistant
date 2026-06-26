@@ -127,3 +127,26 @@ ${contextSection}
 ---
 Please incorporate any relevant insights from the above context into your research, while focusing primarily on the main research query.`;
 }
+
+export function augmentPromptWithWebSearch(
+  originalPrompt: string,
+  results: { title: string; url: string; content: string }[]
+): string {
+  if (results.length === 0) {
+    return originalPrompt;
+  }
+
+  const sourcesSection = results
+    .map((r, i) => `[Source ${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content}`)
+    .join('\n\n');
+
+  return `${originalPrompt}
+
+---
+The following are live web search results relevant to this query. Ground your research in these sources and cite them (by URL) where used:
+
+${sourcesSection}
+
+---
+Please prioritize factual accuracy from the above sources over prior knowledge, and continue to focus primarily on the main research query.`;
+}
