@@ -15,11 +15,16 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
   const maxWidth = pageWidth - 2 * margin;
   let yPosition = margin;
 
+  // Strip characters outside jsPDF's built-in helvetica font range (Latin only).
+  // Non-Latin glyphs cause the spaced-out letter rendering in the PDF.
+  const sanitizeForPDF = (text: string): string =>
+    text.replace(/[^\x00-\x7FÀ-ɏ]/g, '').trim();
+
   const addText = (text: string, fontSize: number = 10, isBold: boolean = false, indent: number = 0) => {
     doc.setFontSize(fontSize);
     doc.setFont('helvetica', isBold ? 'bold' : 'normal');
 
-    const lines = doc.splitTextToSize(text, maxWidth - indent);
+    const lines = doc.splitTextToSize(sanitizeForPDF(text), maxWidth - indent);
 
     for (let i = 0; i < lines.length; i++) {
       if (yPosition + 10 > pageHeight - margin) {

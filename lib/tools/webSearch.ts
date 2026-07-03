@@ -2,6 +2,12 @@
 // Exposed as a standalone function so a future agent/ReAct loop can call it
 // as a discrete "tool" alongside RAG retrieval.
 
+// jsPDF only supports Latin characters with its built-in fonts.
+// Strip non-Latin Unicode from search result text before it reaches the PDF or prompt.
+function sanitizeText(text: string): string {
+  return text.replace(/[^\x00-\x7FÀ-ɏ]/g, '').trim();
+}
+
 export interface WebSearchResult {
   title: string;
   url: string;
@@ -43,9 +49,9 @@ export async function webSearch(
   const data = await response.json();
 
   const results: WebSearchResult[] = (data.results || []).map((r: any) => ({
-    title: r.title || '',
+    title: sanitizeText(r.title || ''),
     url: r.url || '',
-    content: r.content || '',
+    content: sanitizeText(r.content || ''),
   }));
 
   return { results };

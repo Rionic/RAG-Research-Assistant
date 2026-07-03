@@ -35,3 +35,4 @@ The long-term goal: evolve from a fixed research pipeline into something genuine
 2. **ReAct planner loop** — replace the current fixed sequence (always RAG + always web search + always both LLMs) with a loop where the model decides at each step whether to retrieve from memory, search the web, ask a clarifying question, or conclude. Now meaningful since there are real tools with different tradeoffs to choose between.
 3. **Eval harness** — small fixed set of test queries (20-30) scored on tool-selection accuracy, retrieval relevance, and groundedness (now checkable against real web sources instead of model-only claims).
 4. **Optional stretch:** richer cross-session memory in Firestore; multi-agent split (researcher/writer) — lower priority, only if there's time/interest.
+                                                     
