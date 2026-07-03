@@ -8,6 +8,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Pin Node to match local — Qdrant client's bundled undici throws
+      # UND_ERR_INVALID_ARG on some newer Node runtimes (see also .nvmrc)
+      - key: NODE_VERSION
+        value: 24.16.0
       - key: NEXT_PUBLIC_FIREBASE_API_KEY
         sync: false
       - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
