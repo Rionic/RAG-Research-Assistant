@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { ResearchSession, StartResearchRequest, WebSource } from '@/types';
 import { getOpenAI, performResearch } from '@/lib/research';
-import { retrieveContext, augmentPrompt, augmentPromptWithWebSearch } from '@/lib/rag';
+import { retrieveContext } from '@/lib/rag';
+import { augmentPromptWithPastResearch, augmentPromptWithWebSources } from '@/lib/prompts';
 import { webSearch } from '@/lib/tools/webSearch';
 
 export async function POST(request: NextRequest) {
@@ -31,12 +32,14 @@ export async function POST(request: NextRequest) {
 
     // Case 1: No refinement questions
     if (refinementQuestions.length === 0) {
-      let finalPrompt = prompt;
+      // Augmented context (RAG + web) is LLM input only — never persisted,
+      // so reports/embeddings don't get polluted with raw source dumps
+      let researchPrompt = prompt;
       try {
         // RAG retrieval & augment entry points
         const ragContext = await retrieveContext(prompt, userId);
         if (ragContext.relevantResults.length > 0) {
-          finalPrompt = augmentPrompt(finalPrompt, ragContext);
+          researchPrompt = augmentPromptWithPastResearch(researchPrompt, ragContext);
           console.log(`Augmented prompt with ${ragContext.relevantResults.length} RAG results`);
         } else {
           console.log('No RAG results retrieved (no similar past research or below similarity threshold)');
@@ -45,12 +48,12 @@ export async function POST(request: NextRequest) {
         console.error('RAG retrieval failed, continuing without context:', error);
       }
 
-      // Web search entry point — grounds research in live sources instead of model-only knowledge
+      // Web search entry point: Grounds research in live sources instead of model-only knowledge
       let webSources: WebSource[] = [];
       try {
         const { results } = await webSearch(prompt);
         if (results.length > 0) {
-          finalPrompt = augmentPromptWithWebSearch(finalPrompt, results);
+          researchPrompt = augmentPromptWithWebSources(researchPrompt, results);
           webSources = results.map(r => ({ title: r.title, url: r.url }));
           console.log(`Augmented prompt with ${results.length} web search results`);
         }
@@ -59,13 +62,13 @@ export async function POST(request: NextRequest) {
       }
 
       // Research session with document metadata
+      // No refinedPrompt here — with no refinement questions it would just duplicate initialPrompt
       const session: ResearchSession = {
         id: sessionId,
         userId,
         userEmail,
         userTimezone: timezone,
         initialPrompt: prompt,
-        refinedPrompt: finalPrompt,
         refinementQuestions: [],
         webSources,
         status: 'processing',
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
       // Update firestore with new session data
       await sessionRef.set(session);
       // Fire without await. Research runs in background while API returns immediately
-      performResearch(sessionId, finalPrompt);
+      performResearch(sessionId, researchPrompt);
 
       // Return to frontend to display processing UI
       return NextResponse.json({

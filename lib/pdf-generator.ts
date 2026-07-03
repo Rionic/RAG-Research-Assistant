@@ -15,26 +15,76 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
   const maxWidth = pageWidth - 2 * margin;
   let yPosition = margin;
 
-  // Strip characters outside jsPDF's built-in helvetica font range (Latin only).
-  // Non-Latin glyphs cause the spaced-out letter rendering in the PDF.
+  // jsPDF's built-in helvetica font only covers Latin. Non-Latin glyphs render
+  // as spaced-out garbage, so we sanitize before drawing. But first normalize the
+  // common typographic characters LLMs emit (dashes, curly quotes, non-breaking
+  // spaces) to ASCII equivalents — otherwise stripping them merges adjacent text
+  // (e.g. "2.5–3.75" -> "2.53.75", "long‑term" -> "longterm").
   const sanitizeForPDF = (text: string): string =>
-    text.replace(/[^\x00-\x7FÀ-ɏ]/g, '').trim();
+    text
+      .replace(/[‐-―−]/g, '-') // hyphens, en/em/figure dashes, minus
+      .replace(/[‘’‚‛]/g, "'") // curly single quotes
+      .replace(/[“”„‟]/g, '"') // curly double quotes
+      .replace(/…/g, '...') // ellipsis
+      .replace(/[  -   　]/g, ' ') // non-breaking / thin spaces
+      .replace(/​/g, '') // zero-width space
+      .replace(/[^\x00-\x7FÀ-ɏ]/g, '') // strip remaining non-Latin
+      .trim();
+
+  // Ensures room before drawing; adds a page and resets y when near the bottom.
+  const ensureSpace = (needed: number = 10) => {
+    if (yPosition + needed > pageHeight - margin) {
+      doc.addPage();
+      yPosition = margin;
+    }
+  };
 
   const addText = (text: string, fontSize: number = 10, isBold: boolean = false, indent: number = 0) => {
     doc.setFontSize(fontSize);
     doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+    doc.setTextColor(0, 0, 0);
 
     const lines = doc.splitTextToSize(sanitizeForPDF(text), maxWidth - indent);
 
     for (let i = 0; i < lines.length; i++) {
-      if (yPosition + 10 > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
+      ensureSpace();
       doc.text(lines[i], margin + indent, yPosition);
       yPosition += fontSize * 0.5;
     }
     yPosition += 5;
+  };
+
+  // Section heading with an accent underline rule, used for the top-level report sections.
+  const addSectionHeading = (
+    title: string,
+    accent: [number, number, number] = [41, 128, 185]
+  ) => {
+    ensureSpace(16);
+    addText(title, 16, true);
+    doc.setDrawColor(accent[0], accent[1], accent[2]);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPosition - 2, pageWidth - margin, yPosition - 2);
+    yPosition += 4;
+  };
+
+  // A label: value pair on one line (bold label, normal value), wrapping the value.
+  const addLabeledLine = (label: string, value: string, indent: number = 0) => {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    const labelText = `${label} `;
+    ensureSpace();
+    doc.text(labelText, margin + indent, yPosition);
+    const labelWidth = doc.getTextWidth(labelText);
+
+    doc.setFont('helvetica', 'normal');
+    const valueIndent = indent + labelWidth;
+    const lines = doc.splitTextToSize(sanitizeForPDF(value), maxWidth - valueIndent);
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) ensureSpace();
+      doc.text(lines[i], margin + valueIndent, yPosition);
+      yPosition += 5;
+    }
   };
 
   const addMarkdownText = (markdownText: string) => {
@@ -54,9 +104,23 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
         yPosition += 2;
         break;
 
-      case 'paragraph':
-        addText(cleanMarkdown(token.text), 10);
+      case 'paragraph': {
+        const cleaned = cleanMarkdown(token.text);
+        // Drop empty paragraphs and standalone "Sources:"/"References:" labels —
+        // the model's inline source lists are stripped, and we render Web Sources separately.
+        if (!cleaned.trim() || /^\s*(sources|references)\s*:?\s*$/i.test(cleaned)) {
+          break;
+        }
+        // Some models (esp. OpenAI) emit section titles as plain paragraphs
+        // instead of markdown headings. Render heading-like lines as bold.
+        if (looksLikeHeading(token.text, cleaned)) {
+          yPosition += 2;
+          addText(cleaned, 12, true);
+        } else {
+          addText(cleaned, 10);
+        }
         break;
+      }
 
       case 'list':
         renderList(token);
@@ -85,32 +149,45 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
     }
   };
 
+  // Heuristic for a title emitted as a plain paragraph rather than a markdown heading:
+  // short, bold in the source, or wrapped in **, and not ending in sentence punctuation.
+  const looksLikeHeading = (raw: string, cleaned: string): boolean => {
+    const trimmed = cleaned.trim();
+    if (!trimmed) return false;
+    const wasBold = /^\s*\*\*[^*]+\*\*\s*$/.test(raw.trim());
+    const wordCount = trimmed.split(/\s+/).length;
+    const endsLikeSentence = /[.:,;?!)]$/.test(trimmed);
+    return wasBold || (wordCount <= 8 && !endsLikeSentence);
+  };
+
   const renderList = (listToken: any, indentLevel: number = 0) => {
     let itemNumber = listToken.start || 1;
 
     for (const item of listToken.items) {
+      const cleanedItem = cleanMarkdown(item.text);
+      // URL-only list items (e.g. a "Sources:" list of bare links) go empty after
+      // URL stripping — skip them; sources are listed in the Web Sources section.
+      if (!cleanedItem.trim()) {
+        if (listToken.ordered) itemNumber++;
+        continue;
+      }
+
       const bullet = listToken.ordered ? `${itemNumber}. ` : '• ';
       const bulletWidth = doc.getTextWidth(bullet);
       const leftIndent = indentLevel * 8;
 
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
 
-      if (yPosition + 10 > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
-
+      ensureSpace();
       doc.text(bullet, margin + leftIndent, yPosition);
 
       const textIndent = leftIndent + bulletWidth + 2;
-      const lines = doc.splitTextToSize(cleanMarkdown(item.text), maxWidth - textIndent);
+      const lines = doc.splitTextToSize(cleanedItem, maxWidth - textIndent);
 
       for (let i = 0; i < lines.length; i++) {
-        if (i > 0 && yPosition + 10 > pageHeight - margin) {
-          doc.addPage();
-          yPosition = margin;
-        }
+        if (i > 0) ensureSpace();
         doc.text(lines[i], margin + textIndent, yPosition);
         yPosition += 5;
       }
@@ -133,36 +210,44 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
 
     const numColumns = tableToken.header.length;
     const columnWidth = maxWidth / numColumns;
-    const rowHeight = 8;
     const cellPadding = 2;
+    const lineHeight = 4.2;
 
+    // Draws one row, wrapping cell text over multiple lines and sizing the row
+    // to the tallest cell so nothing is truncated mid-sentence.
     const drawRow = (cells: string[], isHeader: boolean = false) => {
-      if (yPosition + rowHeight > pageHeight - margin) {
-        doc.addPage();
-        yPosition = margin;
-      }
-
-      const startY = yPosition;
-
       doc.setFontSize(isHeader ? 10 : 9);
       doc.setFont('helvetica', isHeader ? 'bold' : 'normal');
+      doc.setTextColor(0, 0, 0);
 
-      for (let i = 0; i < cells.length; i++) {
-        const x = margin + (i * columnWidth);
-        const text = cleanMarkdown(cells[i]);
+      const maxCellWidth = columnWidth - 2 * cellPadding;
+      const wrapped = cells.map(c =>
+        doc.splitTextToSize(cleanMarkdown(c), maxCellWidth)
+      );
+      const maxLines = Math.max(1, ...wrapped.map(w => w.length));
+      const rowHeight = maxLines * lineHeight + 2 * cellPadding;
 
-        doc.setDrawColor(200, 200, 200);
-        doc.rect(x, startY, columnWidth, rowHeight);
+      ensureSpace(rowHeight);
+      const startY = yPosition;
+
+      for (let i = 0; i < numColumns; i++) {
+        const x = margin + i * columnWidth;
 
         if (isHeader) {
           doc.setFillColor(240, 240, 240);
           doc.rect(x, startY, columnWidth, rowHeight, 'F');
-          doc.rect(x, startY, columnWidth, rowHeight);
         }
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(x, startY, columnWidth, rowHeight);
 
-        const maxCellWidth = columnWidth - (2 * cellPadding);
-        const truncatedText = doc.splitTextToSize(text, maxCellWidth)[0] || '';
-        doc.text(truncatedText, x + cellPadding, startY + 5);
+        const cellLines = wrapped[i] || [];
+        for (let l = 0; l < cellLines.length; l++) {
+          doc.text(
+            cellLines[l],
+            x + cellPadding,
+            startY + cellPadding + lineHeight * (l + 1) - 1
+          );
+        }
       }
 
       yPosition += rowHeight;
@@ -181,15 +266,29 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
     yPosition += 5;
   };
 
+  // Sanitizes here as well since lists/tables call doc.text directly, bypassing addText
   const cleanMarkdown = (text: string): string => {
-    return text
-      .replace(/\*\*/g, '')
-      .replace(/\*/g, '')
-      .replace(/__/g, '')
-      .replace(/_/g, '')
-      .replace(/`/g, '')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    return sanitizeForPDF(
+      text
+        .replace(/<br\s*\/?>/gi, ' ')
+        .replace(/<\/?[a-z][^>]*>/gi, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/__/g, '')
+        .replace(/_/g, '')
+        .replace(/`/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        // Drop bare/parenthesized inline URLs — sources are listed cleanly in Web Sources
+        .replace(/\s*\(https?:\/\/[^)]+\)/g, '')
+        .replace(/https?:\/\/\S+/g, '')
+        // Tidy leftover empty parens / doubled spaces / space-before-punctuation
+        .replace(/\(\s*\)/g, '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/\s+([.,;:])/g, '$1')
+    );
   };
+
+  // --- Header banner ---
   doc.setFillColor(41, 128, 185);
   doc.rect(0, 0, pageWidth, 40, 'F');
   doc.setTextColor(255, 255, 255);
@@ -200,12 +299,11 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
   yPosition = 50;
   doc.setTextColor(0, 0, 0);
 
-  addText('Research Summary', 16, true);
-  addText(`Initial Prompt: ${session.initialPrompt}`, 10);
+  // --- Research Summary ---
+  addSectionHeading('Research Summary');
 
-  if (session.refinedPrompt) {
-    addText(`Refined Prompt: ${session.refinedPrompt}`, 10);
-  }
+  addLabeledLine('Prompt:', session.initialPrompt);
+  yPosition += 3;
 
   const createdDate = (session.createdAt as any)._seconds
     ? new Date((session.createdAt as any)._seconds * 1000)
@@ -215,50 +313,69 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
     ? createdDate.toLocaleString('en-US', { timeZone: session.userTimezone })
     : createdDate.toLocaleString('en-US');
 
-  addText(`Date: ${dateString}`, 10);
-  addText(`Status: ${session.status.toUpperCase()}`, 10);
+  addLabeledLine('Date:', dateString);
+  addLabeledLine('Status:', session.status.replace(/_/g, ' ').toUpperCase());
 
-  yPosition += 10;
+  yPosition += 8;
 
+  // --- Refinement Questions & Answers ---
+  // (Q&A lives only here now — no longer duplicated inside the summary block.)
   if (session.refinementQuestions.length > 0) {
-    addText('Refinement Questions & Answers', 16, true);
+    addSectionHeading('Refinement Questions & Answers');
     session.refinementQuestions.forEach((q, index) => {
       addText(`${index + 1}. ${q.question}`, 11, true);
       if (q.answer) {
-        addText(`Answer: ${q.answer}`, 10);
+        addLabeledLine('Answer:', q.answer, 5);
+        yPosition += 2;
       }
       yPosition += 3;
     });
+    yPosition += 6;
   }
 
-  yPosition += 10;
-
+  // --- Research results ---
   if (session.openaiResult) {
-    addText('OpenAI Deep Research Results', 16, true);
-    doc.setDrawColor(41, 128, 185);
-    doc.line(margin, yPosition, pageWidth - margin, yPosition);
-    yPosition += 5;
+    addSectionHeading('OpenAI Deep Research Results', [41, 128, 185]);
     addMarkdownText(session.openaiResult);
     yPosition += 10;
   }
 
   if (session.geminiResult) {
-    addText('Google Gemini Research Results', 16, true);
-    doc.setDrawColor(219, 68, 55);
-    doc.line(margin, yPosition, pageWidth - margin, yPosition);
-    yPosition += 5;
+    addSectionHeading('Google Gemini Research Results', [219, 68, 55]);
     addMarkdownText(session.geminiResult);
     yPosition += 10;
   }
 
+  // --- Web Sources ---
   if (session.webSources && session.webSources.length > 0) {
-    addText('Web Sources', 16, true);
+    addSectionHeading('Web Sources');
+
     session.webSources.forEach((source, index) => {
-      addText(`${index + 1}. ${source.title}`, 10);
-      addText(source.url, 9);
+      ensureSpace();
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const label = `${index + 1}. `;
+      doc.setTextColor(0, 0, 0);
+      doc.text(label, margin, yPosition);
+      const labelWidth = doc.getTextWidth(label);
+
+      // Title only, one line, rendered as a blue underlined hyperlink (matches email style)
+      const title = sanitizeForPDF(source.title) || source.url;
+      const titleLine = doc.splitTextToSize(title, maxWidth - labelWidth)[0] || '';
+      doc.setTextColor(17, 85, 204);
+      doc.textWithLink(titleLine, margin + labelWidth, yPosition, { url: source.url });
+      const titleWidth = doc.getTextWidth(titleLine);
+      doc.setDrawColor(17, 85, 204);
+      doc.line(margin + labelWidth, yPosition + 1, margin + labelWidth + titleWidth, yPosition + 1);
+
+      yPosition += 7;
     });
+
+    doc.setTextColor(0, 0, 0);
   }
 
+  // --- Footer on every page ---
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -271,7 +388,7 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
       { align: 'center' }
     );
     doc.text(
-      `Generated by Multi-API Deep Research Assistant`,
+      `Generated by RAG Research Assistant`,
       pageWidth / 2,
       pageHeight - 5,
       { align: 'center' }

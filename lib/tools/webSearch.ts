@@ -28,6 +28,11 @@ export async function webSearch(
     throw new Error('TAVILY_API_KEY must be set');
   }
 
+  // Tavily rejects queries under 2 chars — skip the round-trip and return no results
+  if (query.trim().length < 2) {
+    return { results: [] };
+  }
+
   const response = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: {

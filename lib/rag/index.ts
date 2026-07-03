@@ -17,7 +17,8 @@ export interface RAGContext {
 const TOP_K_DEFAULT = 5;
 const SIMILARITY_THRESHOLD = 0.6;
 
-// Index file - top-level file to handle calls for all RAG ops (embed, retrieve, agument)
+// Index file - top-level file to handle calls for all RAG ops (embed, retrieve)
+// Prompt assembly lives in lib/prompts.ts
 
 // Called only once research task is complete, and all research metadata is available
 export async function embedResearchResults(session: ResearchSession): Promise<void> {
@@ -102,51 +103,4 @@ export async function retrieveContext(
     console.error('Failed to retrieve RAG context:', error);
     return { relevantResults: [] };
   }
-}
-
-export function augmentPrompt(originalPrompt: string, context: RAGContext): string {
-  if (context.relevantResults.length === 0) {
-    return originalPrompt;
-  }
-
-  // Gives agent every returned relevant previous research chunk alongside original prompt and similarity score
-  const contextSection = context.relevantResults
-    .map(
-      (r, i) =>
-        `[Previous Research ${i + 1}] (Similarity: ${(r.similarity * 100).toFixed(1)}%)\nOriginal Query: ${r.originalPrompt}\nRelevant Finding: ${r.text}`
-    )
-    .join('\n\n');
-
-  return `${originalPrompt}
-
----
-The following are relevant findings from previous research that may provide helpful context:
-
-${contextSection}
-
----
-Please incorporate any relevant insights from the above context into your research, while focusing primarily on the main research query.`;
-}
-
-export function augmentPromptWithWebSearch(
-  originalPrompt: string,
-  results: { title: string; url: string; content: string }[]
-): string {
-  if (results.length === 0) {
-    return originalPrompt;
-  }
-
-  const sourcesSection = results
-    .map((r, i) => `[Source ${i + 1}] ${r.title}\nURL: ${r.url}\n${r.content}`)
-    .join('\n\n');
-
-  return `${originalPrompt}
-
----
-The following are live web search results relevant to this query. Ground your research in these sources and cite them (by URL) where used:
-
-${sourcesSection}
-
----
-Please prioritize factual accuracy from the above sources over prior knowledge, and continue to focus primarily on the main research query.`;
 }
