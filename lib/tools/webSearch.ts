@@ -12,7 +12,11 @@ export interface WebSearchResult {
   title: string;
   url: string;
   content: string;
+  score: number;
 }
+
+// Threshold for web sources to be considered
+const MIN_RELEVANCE_SCORE = 0.3;
 
 export interface WebSearchResponse {
   results: WebSearchResult[];
@@ -53,11 +57,15 @@ export async function webSearch(
 
   const data = await response.json();
 
-  const results: WebSearchResult[] = (data.results || []).map((r: any) => ({
-    title: sanitizeText(r.title || ''),
-    url: r.url || '',
-    content: sanitizeText(r.content || ''),
-  }));
+  const results: WebSearchResult[] = (data.results || [])
+    .map((r: any) => ({
+      title: sanitizeText(r.title || ''),
+      url: r.url || '',
+      content: sanitizeText(r.content || ''),
+      score: typeof r.score === 'number' ? r.score : 0,
+    }))
+    // Drop off-topic results; an empty list tells callers the query whiffed and should be rephrased
+    .filter((r: WebSearchResult) => r.score >= MIN_RELEVANCE_SCORE);
 
   return { results };
 }

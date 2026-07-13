@@ -196,7 +196,9 @@ async function runPlannerLoop(prompt: string, userId: string): Promise<GatheredC
   // overlap), then cap so the compiled prompt stays within Groq request limits.
   // webSources lists exactly what went into the prompt, so citations stay honest
   const dedupedRag = dedupeBy(ragResults, (r) => `${r.sessionId}:${r.text}`).slice(0, MAX_RAG_RESULTS);
+  // Sort by Tavily relevance before capping
   const dedupedWeb = dedupeBy(webResults, (r) => r.url)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     .slice(0, MAX_WEB_RESULTS)
     .map((r) => ({ ...r, content: r.content.slice(0, WEB_CONTENT_CHAR_LIMIT) }));
   const webSources: WebSource[] = dedupedWeb.map((r) => ({ title: r.title, url: r.url }));

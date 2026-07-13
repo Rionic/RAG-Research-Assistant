@@ -61,8 +61,9 @@ export function registerTools(server: McpServer): void {
         'Search the live web (via Tavily) for current information. Use when the question needs ' +
         'fresh facts, news, or citable sources. Prefer rag_retrieve first when the topic may ' +
         'overlap with research this user has already completed — it returns already-synthesized ' +
-        'findings and is cheaper. Returns a JSON list of {title, url, content} snippets. ' +
-        'Queries under 2 characters return no results.',
+        'findings and is cheaper. Returns a JSON list of {title, url, content, score} snippets ' +
+        '(score = relevance, 0-1; low-relevance results are filtered out server-side). An empty ' +
+        'results list means the query missed — rephrase with more specific or disambiguating terms.',
       inputSchema: {
         query: z.string().min(2).describe('Natural-language search query'),
         maxResults: z
