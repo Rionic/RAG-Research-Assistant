@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { adminDb } from '@/lib/firebase-admin';
 import { ResearchSession } from '@/types';
 import { embedResearchResults } from '@/lib/rag';
+import { gatherContext } from '@/lib/agent/planner';
 
 // Original OpenAI client (GPT-4o) — kept for reference
 // export function getOpenAI() {
@@ -23,15 +24,36 @@ export function getGeminiAI() {
   });
 }
 
-export async function performResearch(sessionId: string, refinedPrompt: string) {
+export async function performResearch(sessionId: string, cleanPrompt: string) {
   const sessionRef = adminDb.collection('research_sessions').doc(sessionId);
 
   try {
     console.log('Starting research for session:', sessionId);
 
+    // Planner needs userId for rag_retrieve identity injection
+    const preDoc = await sessionRef.get();
+    const preSession = preDoc.data() as ResearchSession;
+
+    // ReAct context gathering via MCP tools (falls back internally to the
+    // fixed RAG+web sequence). Augmented prompt is LLM input only — never persisted
+    const { augmentedPrompt, webSources, trace, plannerUsed } = await gatherContext(
+      cleanPrompt,
+      preSession.userId
+    );
+
+    await sessionRef.update({
+      webSources,
+      plannerTrace: trace,
+      updatedAt: new Date(),
+    });
+    console.log(
+      `Context gathered (${plannerUsed ? 'planner' : 'fixed fallback'}): ` +
+        `${webSources.length} web sources, ${trace.length} trace steps`
+    );
+
     const [openaiResult, geminiResult] = await Promise.all([
-      performOpenAIResearch(refinedPrompt),
-      performGeminiResearch(refinedPrompt),
+      performOpenAIResearch(augmentedPrompt),
+      performGeminiResearch(augmentedPrompt),
     ]);
 
     // Research complete

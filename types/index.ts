@@ -26,6 +26,19 @@ export interface WebSource {
   url: string;
 }
 
+// One step of the ReAct planner loop, persisted for observability and the
+// future eval harness. All optional slots are null (never undefined —
+// Firestore rejects undefined values).
+export interface PlannerTraceStep {
+  step: number;
+  thought: string | null;      // assistant text alongside/instead of tool calls
+  toolName: string | null;     // null on the concluding step
+  arguments: Record<string, unknown> | null;
+  observation: string | null;  // truncated to keep the session doc small
+  isError: boolean;
+  durationMs: number;
+}
+
 // Research session with all related metadata
 export interface ResearchSession {
   id: string;
@@ -36,6 +49,7 @@ export interface ResearchSession {
   refinedPrompt?: string;
   refinementQuestions: RefinementQuestion[];
   webSources?: WebSource[];
+  plannerTrace?: PlannerTraceStep[];
   openaiResult?: string;
   geminiResult?: string;
   status: ResearchStatus;
