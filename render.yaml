@@ -38,3 +38,14 @@ services:
         sync: false
       - key: SENDGRID_FROM_EMAIL
         sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      # Bearer token for the remote MCP endpoint (/api/mcp/mcp)
+      - key: MCP_API_KEY
+        generateValue: true

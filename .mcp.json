@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "research-assistant": {
+      "command": "npx",
+      "args": ["tsx", "scripts/mcp-stdio.ts"]
+    }
+  }
+}

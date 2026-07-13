@@ -15,7 +15,8 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export async function sendResearchReport(session: ResearchSession): Promise<void> {
+// pdfBuffer is optional so callers (e.g. MCP tools) can supply a pre-rendered report
+export async function sendResearchReport(session: ResearchSession, pdfBuffer?: Buffer): Promise<void> {
   if (!process.env.SENDGRID_API_KEY) {
     throw new Error('SendGrid API key is not configured');
   }
@@ -24,7 +25,7 @@ export async function sendResearchReport(session: ResearchSession): Promise<void
     throw new Error('SendGrid from email is not configured');
   }
 
-  const pdfBuffer = await generateResearchPDF(session);
+  const attachmentBuffer = pdfBuffer ?? await generateResearchPDF(session);
   const summary = generateEmailSummary(session);
 
   const msg = {
@@ -38,7 +39,7 @@ export async function sendResearchReport(session: ResearchSession): Promise<void
     html: generateEmailHTML(session, summary),
     attachments: [
       {
-        content: pdfBuffer.toString('base64'),
+        content: attachmentBuffer.toString('base64'),
         filename: `research-report-${session.id}.pdf`,
         type: 'application/pdf',
         disposition: 'attachment',

@@ -21,7 +21,11 @@ const SIMILARITY_THRESHOLD = 0.6;
 // Prompt assembly lives in lib/prompts.ts
 
 // Called only once research task is complete, and all research metadata is available
-export async function embedResearchResults(session: ResearchSession): Promise<void> {
+// Throws on failure so callers (MCP tools, fire-and-forget .catch in lib/research.ts)
+// can distinguish "nothing to embed" from a real Qdrant/embedding error
+export async function embedResearchResults(
+  session: ResearchSession
+): Promise<{ pointsEmbedded: number }> {
   try {
     // Check that Qdrant collection exists
     await ensureCollection();
@@ -80,8 +84,11 @@ export async function embedResearchResults(session: ResearchSession): Promise<vo
       await upsertVectors(points);
       console.log(`Embedded ${points.length} chunks for session ${session.id}`);
     }
+
+    return { pointsEmbedded: points.length };
   } catch (error) {
     console.error('Failed to embed research results:', error);
+    throw error;
   }
 }
 
