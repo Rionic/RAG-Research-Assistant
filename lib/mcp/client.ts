@@ -1,6 +1,6 @@
 // In-process MCP client: connects an SDK Client to the app's own McpServer
 // over a linked in-memory transport pair. This is how the ReAct planner
-// consumes tools — over real MCP, not direct function imports — with zero
+// consumes tools: real MCP rather than direct function imports, with zero
 // network overhead.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';

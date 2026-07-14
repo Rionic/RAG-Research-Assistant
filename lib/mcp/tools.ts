@@ -2,7 +2,7 @@
 // PDF generation, email delivery) as discrete MCP tools.
 // Transport-agnostic: imported by both the Streamable HTTP route
 // (app/api/mcp/[transport]/route.ts) and the stdio entry (scripts/mcp-stdio.ts).
-// Tool descriptions are written for an LLM planner audience — the future ReAct
+// Tool descriptions are written for an LLM planner audience; the future ReAct
 // loop (step 2 of the roadmap) selects between these tools at each step.
 
 import { z } from 'zod';
@@ -17,7 +17,7 @@ import { ResearchSession } from '@/types';
 
 // Session-shaped tools take a sessionId and fetch server-side rather than
 // round-tripping multi-KB session JSON through the model. Firestore Timestamps
-// flow through untouched — pdf-generator/email-sender already handle that shape.
+// flow through untouched; pdf-generator/email-sender already handle that shape.
 async function getSession(sessionId: string): Promise<ResearchSession> {
   const snap = await adminDb.collection('research_sessions').doc(sessionId).get();
   if (!snap.exists) {
@@ -60,10 +60,10 @@ export function registerTools(server: McpServer): void {
       description:
         'Search the live web (via Tavily) for current information. Use when the question needs ' +
         'fresh facts, news, or citable sources. Prefer rag_retrieve first when the topic may ' +
-        'overlap with research this user has already completed — it returns already-synthesized ' +
+        'overlap with research this user has already completed; it returns already-synthesized ' +
         'findings and is cheaper. Returns a JSON list of {title, url, content, score} snippets ' +
         '(score = relevance, 0-1; low-relevance results are filtered out server-side). An empty ' +
-        'results list means the query missed — rephrase with more specific or disambiguating terms.',
+        'results list means the query missed; rephrase with more specific or disambiguating terms.',
       inputSchema: {
         query: z.string().min(2).describe('Natural-language search query'),
         maxResults: z
@@ -116,7 +116,7 @@ export function registerTools(server: McpServer): void {
       description:
         "Persist a completed research session's findings into long-term vector memory so future " +
         'rag_retrieve calls can find them. Call exactly once per session, after research results ' +
-        'exist — calling twice duplicates memory entries. Note: may take 30-60s on the first ' +
+        'exist; calling twice duplicates memory entries. Note: may take 30-60s on the first ' +
         'call after a cold start while the embedding model loads.',
       inputSchema: {
         sessionId: z.string().min(1).describe('Id of a completed research session to embed'),
@@ -141,7 +141,7 @@ export function registerTools(server: McpServer): void {
       description:
         "Render a research session's report as a PDF document, returned as a base64-encoded " +
         'resource. Use when the caller wants the report artifact itself. If the goal is to ' +
-        'deliver the report to the user by email, call send_email instead — it generates and ' +
+        'deliver the report to the user by email, call send_email instead; it generates and ' +
         'attaches the PDF automatically.',
       inputSchema: {
         sessionId: z.string().min(1).describe('Id of the research session to render'),
@@ -175,7 +175,7 @@ export function registerTools(server: McpServer): void {
       title: 'Email research report',
       description:
         "Email the completed research report to the session's registered user, with the PDF " +
-        'report attached. Terminal delivery step — does not require calling generate_pdf first.',
+        'report attached. Terminal delivery step; does not require calling generate_pdf first.',
       inputSchema: {
         sessionId: z.string().min(1).describe('Id of the research session to deliver'),
       },

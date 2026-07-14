@@ -27,8 +27,8 @@ export interface WebSource {
 }
 
 // One step of the ReAct planner loop, persisted for observability and the
-// future eval harness. All optional slots are null (never undefined —
-// Firestore rejects undefined values).
+// future eval harness. All optional slots are null, never undefined
+// (Firestore rejects undefined values).
 export interface PlannerTraceStep {
   step: number;
   thought: string | null;      // assistant text alongside/instead of tool calls

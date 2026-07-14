@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
     // Case 1: No refinement questions
     if (refinementQuestions.length === 0) {
       // Context gathering (RAG + web) now happens inside performResearch via
-      // the ReAct planner loop — the route just persists the session and
+      // the ReAct planner loop; the route just persists the session and
       // returns immediately. webSources/plannerTrace are written mid-run.
-      // No refinedPrompt here — with no refinement questions it would just duplicate initialPrompt
+      // No refinedPrompt here; with no refinement questions it would just duplicate initialPrompt
       const session: ResearchSession = {
         id: sessionId,
         userId,

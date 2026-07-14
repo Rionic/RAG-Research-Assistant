@@ -38,7 +38,7 @@ export async function embedResearchResults(
       for (const chunk of chunks) {
         // Embed each chunk
         const embedding = await generateEmbedding(chunk.text);
-        // Each chunk becomes a VectorPoint — vector, chunkText,
+        // Each chunk becomes a VectorPoint; vector, chunkText,
         // and chunkIndex differ per chunk, metadata stays consistent
         points.push({
           id: randomUUID(),

@@ -5,7 +5,7 @@ import { ResearchSession } from '@/types';
 import { embedResearchResults } from '@/lib/rag';
 import { gatherContext } from '@/lib/agent/planner';
 
-// Original OpenAI client (GPT-4o) — kept for reference
+// Original OpenAI client (GPT-4o), kept for reference
 // export function getOpenAI() {
 //   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // }
@@ -35,7 +35,7 @@ export async function performResearch(sessionId: string, cleanPrompt: string) {
     const preSession = preDoc.data() as ResearchSession;
 
     // ReAct context gathering via MCP tools (falls back internally to the
-    // fixed RAG+web sequence). Augmented prompt is LLM input only — never persisted
+    // fixed RAG+web sequence). Augmented prompt is LLM input only, never persisted
     const { augmentedPrompt, webSources, trace, plannerUsed } = await gatherContext(
       cleanPrompt,
       preSession.userId
@@ -180,7 +180,7 @@ async function performGeminiResearch(prompt: string): Promise<string> {
     // }
     // return result || 'No response from Gemini deep research agent';
 
-    // Swapped to Gemini 2.0 Flash (free tier) — also quota issues, using Groq mixtral instead
+    // Swapped to Gemini 2.0 Flash (free tier); also quota issues, using Groq mixtral instead
     // const response = await gemini.models.generateContent({
     //   model: 'gemini-2.0-flash',
     //   contents: [{ role: 'user', parts: [{ text: `You are a thorough research assistant....\n\n${prompt}` }] }],

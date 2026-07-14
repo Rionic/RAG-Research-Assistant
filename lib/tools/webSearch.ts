@@ -1,4 +1,4 @@
-// Web search tool — wraps Tavily's search API.
+// Web search tool that wraps Tavily's search API.
 // Exposed as a standalone function so a future agent/ReAct loop can call it
 // as a discrete "tool" alongside RAG retrieval.
 
@@ -32,7 +32,7 @@ export async function webSearch(
     throw new Error('TAVILY_API_KEY must be set');
   }
 
-  // Tavily rejects queries under 2 chars — skip the round-trip and return no results
+  // Tavily rejects queries under 2 chars, so skip the round-trip and return no results
   if (query.trim().length < 2) {
     return { results: [] };
   }

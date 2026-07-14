@@ -8,7 +8,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      # Pin Node to match local — Qdrant client's bundled undici throws
+      # Pin Node to match local; Qdrant client's bundled undici throws
       # UND_ERR_INVALID_ARG on some newer Node runtimes (see also .nvmrc)
       - key: NODE_VERSION
         value: 24.16.0

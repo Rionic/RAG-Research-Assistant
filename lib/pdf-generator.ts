@@ -18,7 +18,7 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
   // jsPDF's built-in helvetica font only covers Latin. Non-Latin glyphs render
   // as spaced-out garbage, so we sanitize before drawing. But first normalize the
   // common typographic characters LLMs emit (dashes, curly quotes, non-breaking
-  // spaces) to ASCII equivalents — otherwise stripping them merges adjacent text
+  // spaces) to ASCII equivalents; otherwise stripping them merges adjacent text
   // (e.g. "2.5–3.75" -> "2.53.75", "long‑term" -> "longterm").
   const sanitizeForPDF = (text: string): string =>
     text
@@ -106,7 +106,7 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
 
       case 'paragraph': {
         const cleaned = cleanMarkdown(token.text);
-        // Drop empty paragraphs and standalone "Sources:"/"References:" labels —
+        // Drop empty paragraphs and standalone "Sources:"/"References:" labels;
         // the model's inline source lists are stripped, and we render Web Sources separately.
         if (!cleaned.trim() || /^\s*(sources|references)\s*:?\s*$/i.test(cleaned)) {
           break;
@@ -166,7 +166,7 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
     for (const item of listToken.items) {
       const cleanedItem = cleanMarkdown(item.text);
       // URL-only list items (e.g. a "Sources:" list of bare links) go empty after
-      // URL stripping — skip them; sources are listed in the Web Sources section.
+      // URL stripping, so skip them; sources are listed in the Web Sources section.
       if (!cleanedItem.trim()) {
         if (listToken.ordered) itemNumber++;
         continue;
@@ -278,7 +278,7 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
         .replace(/_/g, '')
         .replace(/`/g, '')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-        // Drop bare/parenthesized inline URLs — sources are listed cleanly in Web Sources
+        // Drop bare/parenthesized inline URLs; sources are listed cleanly in Web Sources
         .replace(/\s*\(https?:\/\/[^)]+\)/g, '')
         .replace(/https?:\/\/\S+/g, '')
         // Tidy leftover empty parens / doubled spaces / space-before-punctuation
@@ -319,7 +319,7 @@ export async function generateResearchPDF(session: ResearchSession): Promise<Buf
   yPosition += 8;
 
   // --- Refinement Questions & Answers ---
-  // (Q&A lives only here now — no longer duplicated inside the summary block.)
+  // (Q&A lives only here now, no longer duplicated inside the summary block.)
   if (session.refinementQuestions.length > 0) {
     addSectionHeading('Refinement Questions & Answers');
     session.refinementQuestions.forEach((q, index) => {

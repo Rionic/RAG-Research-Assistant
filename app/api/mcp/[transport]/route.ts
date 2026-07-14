@@ -1,4 +1,4 @@
-// Remote MCP server over Streamable HTTP — endpoint: /api/mcp/mcp
+// Remote MCP server over Streamable HTTP; endpoint: /api/mcp/mcp
 // Stateless: mcp-handler builds a fresh McpServer per request (no Redis/SSE),
 // which suits Render's single free instance. Tools live in lib/mcp/tools.ts.
 import { timingSafeEqual } from 'crypto';
