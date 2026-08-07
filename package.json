@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:flow": "npx tsx scripts/test-flow.ts",
-    "mcp:stdio": "tsx scripts/mcp-stdio.ts"
+    "mcp:stdio": "tsx scripts/mcp-stdio.ts",
+    "eval:planner": "tsx scripts/eval-planner.ts"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

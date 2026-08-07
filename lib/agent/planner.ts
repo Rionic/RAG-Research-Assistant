@@ -63,6 +63,13 @@ export interface GatheredContext {
   webSources: WebSource[]; // deduped by URL, persisted → PDF/email citations
   trace: PlannerTraceStep[];
   plannerUsed: boolean; // false when the fixed-sequence fallback ran
+  // The exact deduped/capped results the prompt was built from (post-filter,
+  // pre-truncation) — not persisted, but this is what actually went into the
+  // prompt, unlike trace[].observation which is truncated to OBSERVATION_TRACE_LIMIT
+  // for storage. Consumers that need real similarity/score values (e.g. the
+  // eval harness) should read from here, not by re-parsing the trace.
+  keptRagResults: SearchResult[];
+  keptWebResults: WebSearchResult[];
 }
 
 // Planner builds its own Groq client rather than importing getOpenAI from
@@ -235,7 +242,14 @@ async function runPlannerLoop(prompt: string, userId: string): Promise<GatheredC
     augmentedPrompt += `\n\n---\nResearch focus (from the planning phase): ${finalNote}`;
   }
 
-  return { augmentedPrompt, webSources, trace, plannerUsed: true };
+  return {
+    augmentedPrompt,
+    webSources,
+    trace,
+    plannerUsed: true,
+    keptRagResults: dedupedRag,
+    keptWebResults: dedupedWeb,
+  };
 }
 
 // The pre-planner fixed sequence, kept as the fallback path. Never throws;
@@ -243,11 +257,14 @@ async function runPlannerLoop(prompt: string, userId: string): Promise<GatheredC
 async function gatherContextFixed(prompt: string, userId: string): Promise<GatheredContext> {
   let augmentedPrompt = prompt;
   let webSources: WebSource[] = [];
+  let keptRagResults: SearchResult[] = [];
+  let keptWebResults: WebSearchResult[] = [];
 
   try {
     const ragContext = await retrieveContext(prompt, userId);
     if (ragContext.relevantResults.length > 0) {
       augmentedPrompt = augmentPromptWithPastResearch(augmentedPrompt, ragContext);
+      keptRagResults = ragContext.relevantResults;
     }
   } catch (error) {
     console.error('Fallback RAG retrieval failed, continuing without:', error);
@@ -258,6 +275,7 @@ async function gatherContextFixed(prompt: string, userId: string): Promise<Gathe
     if (results.length > 0) {
       augmentedPrompt = augmentPromptWithWebSources(augmentedPrompt, results);
       webSources = results.map((r) => ({ title: r.title, url: r.url }));
+      keptWebResults = results;
     }
   } catch (error) {
     console.error('Fallback web search failed, continuing without:', error);
@@ -266,6 +284,8 @@ async function gatherContextFixed(prompt: string, userId: string): Promise<Gathe
   return {
     augmentedPrompt,
     webSources,
+    keptRagResults,
+    keptWebResults,
     // Sentinel step so the trace records that the planner didn't run
     trace: [
       {
