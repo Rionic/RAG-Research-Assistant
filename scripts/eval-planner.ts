@@ -10,6 +10,22 @@ import { config } from 'dotenv';
 // vars at import time (e.g. lib/email-sender.ts's sgMail.setApiKey)
 config({ path: ['.env.local', '.env'] });
 
+// The eval harness makes many Groq calls per run (22 planner loops + judge
+// calls) and shares the free-tier 100k-token daily quota with the live app
+// otherwise — an eval run has starved real research requests before. If a
+// dedicated GROQ_EVAL_API_KEY is set, redirect GROQ_API_KEY to it for this
+// process only, before any lib code (which reads GROQ_API_KEY directly)
+// gets imported. Falls back to the shared key with a warning if unset.
+if (process.env.GROQ_EVAL_API_KEY) {
+  process.env.GROQ_API_KEY = process.env.GROQ_EVAL_API_KEY;
+  console.log('[eval] using dedicated GROQ_EVAL_API_KEY (isolated from the live app\'s quota)');
+} else {
+  console.warn(
+    '[eval] WARNING: no GROQ_EVAL_API_KEY set — this run will consume the same daily Groq quota ' +
+      'as the live app. Set GROQ_EVAL_API_KEY in .env.local to isolate eval runs (see .env.example).'
+  );
+}
+
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
